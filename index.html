@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>转盘抽奖 · 中奖概率倍儿高</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  height:100%;
+  font-family:-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+  background:#0D002E;
+  color:#fff;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;
+}
+
+/* ── Page ── */
+.page{
+  width:100%;
+  height:100%;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  position:relative;
+  overflow:hidden;
+  padding:0 16px 20px;
+}
+.page-bg{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(175deg,#3A0CA3 0%,#240080 30%,#1A0050 65%,#0D002E 100%);
+  z-index:0;
+}
+.page-glow{
+  position:absolute;
+  top:44%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:320px;
+  height:320px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(120,40,220,.38) 0%,rgba(80,20,180,.16) 45%,transparent 70%);
+  z-index:0;
+  pointer-events:none;
+}
+.page>*{position:relative;z-index:1}
+.page-bg,.page-glow{position:absolute;z-index:0}
+
+/* ── Title ── */
+.title-wrap{
+  text-align:center;
+  padding:16px 8px 8px;
+  width:100%;
+  flex-shrink:0;
+}
+.t-sub{
+  font-size:12px;
+  letter-spacing:3px;
+  color:rgba(255,200,100,.65);
+  margin-bottom:6px;
+}
+.t-main{
+  font-size:22px;
+  font-weight:900;
+  line-height:1.3;
+  letter-spacing:1px;
+  background:linear-gradient(180deg,#FFF7A0 0%,#FFD700 45%,#FF8C00 85%,#E65100 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 2px 8px rgba(255,160,0,.5));
+}
+
+/* ── Canvas wrap ── */
+.cwrap{
+  position:relative;
+  flex-shrink:0;
+  margin:4px 0 0;
+}
+
+/* ── Chances ── */
+.chances{
+  font-size:12px;
+  color:rgba(220,180,255,.6);
+  margin-top:8px;
+  letter-spacing:.5px;
+  flex-shrink:0;
+}
+.chances b{color:#FFD700}
+
+/* ── Spin button ── */
+.spin-btn{
+  margin-top:12px;
+  width:232px;
+  height:54px;
+  border:none;
+  border-radius:27px;
+  cursor:pointer;
+  background:linear-gradient(135deg,#FF3D00,#C62828);
+  color:#FFD700;
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:2px;
+  box-shadow:0 5px 24px rgba(255,61,0,.45),0 2px 0 #7a0000,inset 0 1px 0 rgba(255,255,255,.15);
+  text-shadow:0 1px 3px rgba(0,0,0,.5);
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+  flex-shrink:0;
+  transition:transform .08s,box-shadow .08s;
+  font-family:-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+}
+.spin-btn:not(:disabled):active{
+  transform:scale(.97);
+  box-shadow:0 2px 10px rgba(255,61,0,.3),0 1px 0 #7a0000;
+}
+.spin-btn:disabled{
+  background:linear-gradient(135deg,#2c2c3e,#1a1a2e) !important;
+  color:#555 !important;
+  box-shadow:none !important;
+  text-shadow:none !important;
+  cursor:not-allowed;
+}
+
+/* ── Footer ── */
+.footer{
+  margin-top:auto;
+  padding-top:10px;
+  font-size:11px;
+  color:rgba(180,140,255,.25);
+  text-align:center;
+  letter-spacing:1px;
+  line-height:2;
+  flex-shrink:0;
+}
+
+/* ── Modal overlay ── */
+.overlay{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
+.overlay.show{
+  opacity:1;
+  pointer-events:auto;
+}
+.overlay.win-ov{
+  background:rgba(10,0,40,.55);
+  -webkit-backdrop-filter:blur(4px);
+  backdrop-filter:blur(4px);
+}
+.overlay.lose-ov{
+  background:rgba(5,0,20,.82);
+  -webkit-backdrop-filter:blur(4px);
+  backdrop-filter:blur(4px);
+}
+
+/* ── Modal card ── */
+.mbox{
+  width:288px;
+  border-radius:22px;
+  padding:28px 24px 24px;
+  text-align:center;
+  transform:scale(.82);
+  opacity:0;
+  transition:transform .32s cubic-bezier(.34,1.56,.64,1), opacity .25s;
+}
+.overlay.show .mbox{
+  transform:scale(1);
+  opacity:1;
+}
+.mbox.win{
+  background:linear-gradient(155deg,#fffbe6,#fff0b0);
+  border:2px solid #FFD700;
+  box-shadow:0 16px 56px rgba(255,180,0,.4),0 2px 0 #B8860B;
+}
+.mbox.lose{
+  background:linear-gradient(155deg,#1c1825,#120e1e);
+  border:2px solid #2e2840;
+  box-shadow:0 16px 56px rgba(0,0,0,.7);
+}
+
+.mic{margin-bottom:12px;display:flex;justify-content:center}
+.mt{font-size:18px;font-weight:900;margin-bottom:8px;line-height:1.3}
+.mbox.win .mt{color:#7a4e00}
+.mbox.lose .mt{color:#7a6fa0}
+.mp{
+  font-size:13px;
+  line-height:1.85;
+  margin-bottom:20px;
+  white-space:pre-line;
+}
+.mbox.win .mp{color:#5a3800}
+.mbox.lose .mp{color:#5a5080}
+.mb{
+  padding:11px 36px;
+  border-radius:18px;
+  border:none;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  letter-spacing:1px;
+  font-family:-apple-system,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+}
+.mbox.win .mb{
+  background:linear-gradient(135deg,#E53935,#B71C1C);
+  color:#FFD700;
+  box-shadow:0 3px 12px rgba(200,40,40,.4);
+}
+.mbox.lose .mb{
+  background:#24203a;
+  color:#7a6fa0;
+  border:1px solid #3a3460;
+}
+
+/* ── Confetti canvas ── */
+#confettiCanvas{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:99;
+  display:none;
+}
+
+/* ── Shake animation for lose ── */
+@keyframes shake{
+  0%  {transform:translateX(0)}
+  12% {transform:translateX(-9px)}
+  24% {transform:translateX(8px)}
+  36% {transform:translateX(-8px)}
+  48% {transform:translateX(7px)}
+  60% {transform:translateX(-5px)}
+  72% {transform:translateX(4px)}
+  84% {transform:translateX(-2px)}
+  100%{transform:translateX(0)}
+}
+.page.shake{animation:shake .55s ease-out}
+</style>
+</head>
+<body>
+
+<div class="page" id="page">
+  <div class="page-bg"></div>
+  <div class="page-glow"></div>
+
+  <div class="title-wrap">
+    <div class="t-sub">✦ 转 盘 抽 奖 ✦</div>
+    <div class="t-main">中奖概率倍儿高！<br>奖品也嘛倍儿好！</div>
+  </div>
+
+  <div class="cwrap">
+    <canvas id="wheelCanvas"></canvas>
+  </div>
+
+  <div class="chances">你还有 <b id="chancesNum">3</b> 次抽奖机会</div>
+
+  <button class="spin-btn" id="spinBtn">🎰 开始抽奖！</button>
+
+  <div class="footer">本游戏纯属娱乐 · 中奖概率倍儿高～</div>
+</div>
+
+<!-- Win modal -->
+<div class="overlay win-ov" id="winOverlay">
+  <div class="mbox win" id="winBox">
+    <div class="mic"><canvas id="winIcon" width="80" height="80"></canvas></div>
+    <div class="mt" id="winTitle"></div>
+    <div class="mp" id="winText"></div>
+    <button class="mb" id="winBtn">再来一次</button>
+  </div>
+</div>
+
+<!-- Lose modal -->
+<div class="overlay lose-ov" id="loseOverlay">
+  <div class="mbox lose" id="loseBox">
+    <div class="mic"><canvas id="loseIcon" width="80" height="80"></canvas></div>
+    <div class="mt" id="loseTitle"></div>
+    <div class="mp" id="loseText"></div>
+    <button class="mb" id="loseBtn">再来一次</button>
+  </div>
+</div>
+
+<!-- Confetti canvas -->
+<canvas id="confettiCanvas"></canvas>
+
+<script>
+(function(){
+'use strict';
+
+// ─────────────────────────────────────────────
+//  Segment data
+// ─────────────────────────────────────────────
+var BASE = 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/';
+var SEGS = [
+  { name:'没中',   prob:50, cA:'#9E9E9E', cB:'#F5F5F5', ic:'#3a3a3a', fn:'crying',
+    imgSrc: BASE+'Crying%20face/3D/crying_face_3d.png',
+    result: { title:'完……没中 😭', text:'我把我爸交养老金的钱\n都输没了！' }
+  },
+  { name:'大金劳', prob:10, cA:'#F9A825', cB:'#FFF9C4', ic:'#4E2800', fn:'watch',
+    imgSrc: BASE+'Watch/3D/watch_3d.png',
+    result: { title:'恭喜！中奖啦 🎉', text:'您获得大金劳一枚！\n中奖概率倍儿高诚不欺我！' }
+  },
+  { name:'手机',   prob:10, cA:'#1565C0', cB:'#E3F2FD', ic:'#0A2540', fn:'phone',
+    imgSrc: BASE+'Mobile%20phone/3D/mobile_phone_3d.png',
+    result: { title:'恭喜！中奖啦 🎉', text:'您获得最新款手机一部！\n奖品也嘛倍儿好！' }
+  },
+  { name:'钞票',   prob:10, cA:'#2E7D32', cB:'#E8F5E9', ic:'#1B3A1B', fn:'cash',
+    imgSrc: BASE+'Dollar%20banknote/3D/dollar_banknote_3d.png',
+    result: { title:'恭喜！中奖啦 🎉', text:'您获得一沓钞票！\n发财了！' }
+  },
+  { name:'奔驰',   prob:10, cA:'#6A1B9A', cB:'#F3E5F5', ic:'#2a004a', fn:'car',
+    imgSrc: BASE+'Automobile/3D/automobile_3d.png',
+    result: { title:'恭喜！中奖啦 🎉', text:'您获得奔驰一辆！\n开出去遛遛！' }
+  },
+  { name:'金条',   prob:10, cA:'#E65100', cB:'#FFF3E0', ic:'#4E1700', fn:'goldbar',
+    imgSrc: BASE+'Coin/3D/coin_3d.png',
+    result: { title:'恭喜！中奖啦 🎉', text:'您获得金条一根！\n烫手的富贵！' }
+  }
+];
+
+// ─────────────────────────────────────────────
+//  Vector icon drawers
+// ─────────────────────────────────────────────
+var DRAW = {
+  crying: function(ctx, s){
+    ctx.beginPath(); ctx.arc(0,0,s*.88,0,Math.PI*2); ctx.stroke();
+    // eyes / brows
+    ctx.beginPath(); ctx.moveTo(-s*.46,-s*.25); ctx.quadraticCurveTo(-s*.28,-s*.52,-s*.10,-s*.25); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo( s*.10,-s*.25); ctx.quadraticCurveTo( s*.28,-s*.52, s*.46,-s*.25); ctx.stroke();
+    // tears
+    var lw=ctx.lineWidth; ctx.lineWidth=lw*.75;
+    ctx.beginPath(); ctx.moveTo(-s*.28,-s*.14); ctx.lineTo(-s*.36,s*.26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo( s*.28,-s*.14); ctx.lineTo( s*.36,s*.26); ctx.stroke();
+    ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.arc(-s*.36,s*.36,s*.09,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( s*.36,s*.36,s*.09,0,Math.PI*2); ctx.fill();
+    // sad mouth
+    ctx.beginPath(); ctx.moveTo(-s*.44,s*.55); ctx.quadraticCurveTo(0,s*.34,s*.44,s*.55); ctx.stroke();
+  },
+  watch: function(ctx, s){
+    ctx.beginPath(); ctx.roundRect(-s*.28,-s*1.06,s*.56,s*.42,2); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-s*.66,-s*.70,s*1.32,s*1.40,s*.34); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(s*.66,-s*.13,s*.28,s*.26,1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,s*.37,0,Math.PI*2); ctx.stroke();
+    var lw=ctx.lineWidth; ctx.lineWidth=lw*1.6;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-s*.26); ctx.stroke();
+    ctx.lineWidth=lw*1.2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s*.20,-s*.08); ctx.stroke();
+    ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.arc(0,0,s*.06,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-s*.28,s*.64,s*.56,s*.42,2); ctx.stroke();
+  },
+  phone: function(ctx, s){
+    ctx.beginPath(); ctx.roundRect(-s*.52,-s*1.02,s*1.04,s*2.04,s*.19); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-s*.36,-s*.78,s*.72,s*1.26,s*.09); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,-s*.90,s*.06,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,s*.85,s*.11,0,Math.PI*2); ctx.stroke();
+  },
+  cash: function(ctx, s){
+    ctx.beginPath(); ctx.roundRect(-s*1.05,-s*.60,s*2.10,s*1.20,s*.09); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0,0,s*.31,s*.31,0,0,Math.PI*2); ctx.stroke();
+    var d=s*.17;
+    ctx.beginPath();
+    ctx.moveTo(-d*.6,-d); ctx.quadraticCurveTo(d*.9,-d,d*.9,-d*.2);
+    ctx.quadraticCurveTo(d*.9,d*.5,-d*.6,d*.5); ctx.quadraticCurveTo(-d*.9,d*.5,-d*.9,d*1.2);
+    ctx.quadraticCurveTo(-d*.9,d*1.8,d*.6,d*1.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-d*1.3); ctx.lineTo(0,d*2.2); ctx.stroke();
+    [[s*.85,s*.40],[s*.85,-s*.40],[-s*.85,s*.40],[-s*.85,-s*.40]].forEach(function(p){
+      ctx.beginPath(); ctx.arc(p[0],p[1],s*.07,0,Math.PI*2); ctx.fill();
+    });
+  },
+  car: function(ctx, s){
+    ctx.beginPath();
+    ctx.moveTo(-s*.92,-s*.06); ctx.lineTo(-s*.60,-s*.40); ctx.lineTo(-s*.32,-s*.74);
+    ctx.quadraticCurveTo(-s*.16,-s*.92,0,-s*.92);
+    ctx.quadraticCurveTo(s*.16,-s*.92,s*.32,-s*.74);
+    ctx.lineTo(s*.60,-s*.40); ctx.lineTo(s*.92,-s*.06);
+    ctx.lineTo(s*.92,s*.08); ctx.lineTo(-s*.92,s*.08); ctx.closePath(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-s*.30,-s*.74); ctx.lineTo(-s*.24,-s*.40);
+    ctx.lineTo(s*.24,-s*.40); ctx.lineTo(s*.30,-s*.74); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-s*.50,s*.26,s*.32,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-s*.50,s*.26,s*.12,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( s*.50,s*.26,s*.32,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc( s*.50,s*.26,s*.12,0,Math.PI*2); ctx.fill();
+  },
+  goldbar: function(ctx, s){
+    ctx.beginPath();
+    ctx.moveTo(-s*.66,-s*.50); ctx.lineTo(s*.66,-s*.50);
+    ctx.lineTo(s*.92,s*.50); ctx.lineTo(-s*.92,s*.50); ctx.closePath(); ctx.stroke();
+    var bv=s*.11;
+    ctx.beginPath();
+    ctx.moveTo(-s*.66+bv,-s*.50+bv); ctx.lineTo(s*.66-bv,-s*.50+bv);
+    ctx.lineTo(s*.92-bv,s*.50-bv); ctx.lineTo(-s*.92+bv,s*.50-bv); ctx.closePath(); ctx.stroke();
+    var lw=ctx.lineWidth; ctx.lineWidth=lw*.65;
+    ctx.beginPath(); ctx.moveTo(-s*.20,-s*.50+bv); ctx.lineTo(-s*.26,s*.50-bv); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo( s*.20,-s*.50+bv); ctx.lineTo( s*.26,s*.50-bv); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-s*.80,0); ctx.lineTo(s*.80,0); ctx.stroke();
+    ctx.lineWidth=lw;
+    ctx.globalAlpha=.4; ctx.lineWidth=lw*1.8;
+    ctx.beginPath(); ctx.moveTo(-s*.50,-s*.26); ctx.lineTo(-s*.16,-s*.26); ctx.stroke();
+    ctx.globalAlpha=1; ctx.lineWidth=lw;
+  }
+};
+
+// ─────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────
+var chances   = 3;
+var spinning  = false;
+var needleAngle = 270; // starts pointing up (top = 270° in canvas convention)
+var animRafId  = null;
+
+// ─────────────────────────────────────────────
+//  Canvas setup
+// ─────────────────────────────────────────────
+var wheelCanvas = document.getElementById('wheelCanvas');
+var wheelCtx    = wheelCanvas.getContext('2d');
+var dpr = window.devicePixelRatio || 1;
+var L, cx, cy, RO, RRing, RI;
+
+function resize(){
+  L = Math.min(window.innerWidth - 32, 300);
+  wheelCanvas.width  = Math.round(L * dpr);
+  wheelCanvas.height = Math.round(L * dpr);
+  wheelCanvas.style.width  = L + 'px';
+  wheelCanvas.style.height = L + 'px';
+  cx = L / 2;
+  cy = L / 2;
+  RO    = L * 0.395;
+  RRing = L * 0.452;
+  RI    = RO * 0.34;
+  drawWheel();
+}
+
+// ─────────────────────────────────────────────
+//  Main wheel draw
+// ─────────────────────────────────────────────
+function drawWheel(){
+  var ctx = wheelCtx;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, L, L);
+
+  var PI = Math.PI;
+  var D2R = PI / 180;
+
+  // 1. Drop shadow
+  ctx.save();
+  ctx.shadowColor  = 'rgba(60,0,150,.72)';
+  ctx.shadowBlur   = 24;
+  ctx.shadowOffsetY = 4;
+  ctx.beginPath(); ctx.arc(cx, cy, RRing, 0, PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,.01)'; ctx.fill();
+  ctx.restore();
+
+  // 2. Outer ring — radial gradient
+  var ringG = ctx.createRadialGradient(cx, cy, RO-2, cx, cy, RRing+2);
+  ringG.addColorStop(0,    '#0f0028');
+  ringG.addColorStop(0.22, '#1A0050');
+  ringG.addColorStop(0.58, '#3D1A8A');
+  ringG.addColorStop(0.82, '#2a0070');
+  ringG.addColorStop(1,    '#0f0028');
+  ctx.beginPath(); ctx.arc(cx, cy, RRing, 0, PI*2);
+  ctx.fillStyle = ringG; ctx.fill();
+
+  // 3. Gold inner border
+  ctx.beginPath(); ctx.arc(cx, cy, RO+1, 0, PI*2);
+  ctx.strokeStyle = 'rgba(255,215,0,.65)';
+  ctx.lineWidth = 1.5; ctx.stroke();
+
+  // 4. LED dots — 24 total, every 3rd orange
+  var nDots = 24;
+  var ledR  = (RO + RRing) / 2;
+  for (var di = 0; di < nDots; di++){
+    var da = (di / nDots) * PI * 2 - PI/2;
+    var dx = cx + Math.cos(da) * ledR;
+    var dy = cy + Math.sin(da) * ledR;
+    var big = (di % 3 === 0);
+    ctx.save();
+    ctx.shadowColor = big ? 'rgba(255,109,0,.95)' : 'rgba(255,255,255,.75)';
+    ctx.shadowBlur  = big ? 11 : 7;
+    ctx.beginPath(); ctx.arc(dx, dy, big ? 5 : 3, 0, PI*2);
+    ctx.fillStyle = big ? '#FF6D00' : '#FFFFFF'; ctx.fill();
+    ctx.restore();
+  }
+
+  // 5. Outer rim stroke
+  ctx.beginPath(); ctx.arc(cx, cy, RRing - 0.5, 0, PI*2);
+  ctx.strokeStyle = 'rgba(80,30,160,.6)';
+  ctx.lineWidth = 1.5; ctx.stroke();
+
+  // 6. Segments — FIXED, wheel does not rotate
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, RO, 0, PI*2); ctx.clip();
+
+  for (var si = 0; si < SEGS.length; si++){
+    var seg = SEGS[si];
+    var s0  = (270 + si * 60) * D2R;
+    var s1  = s0 + PI / 3;
+    var mid = s0 + PI / 6;
+    var gx0 = Math.cos(mid) * (RI + 8);
+    var gy0 = Math.sin(mid) * (RI + 8);
+    var gx1 = Math.cos(mid) * RO;
+    var gy1 = Math.sin(mid) * RO;
+    var sg  = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+    sg.addColorStop(0,    seg.cA + 'f0');
+    sg.addColorStop(0.35, seg.cA + 'cc');
+    sg.addColorStop(1,    seg.cB);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, RO, s0, s1);
+    ctx.closePath();
+    ctx.fillStyle = sg; ctx.fill();
+    // divider
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(s0) * RO, Math.sin(s0) * RO);
+    ctx.strokeStyle = 'rgba(255,255,255,.5)';
+    ctx.lineWidth = 1.2; ctx.stroke();
+  }
+  ctx.restore(); // end clip
+  ctx.restore(); // end translate
+
+  // 7. Icons & text — world frame, FIXED
+  var RiPos = RO * 0.55;
+  var RlPos = RO * 0.80;
+  var IS    = RO * 0.155;
+  var FS    = Math.round(RO * 0.095);
+  if (FS < 9) FS = 9;
+
+  for (var ii = 0; ii < SEGS.length; ii++){
+    var iseg    = SEGS[ii];
+    var worldDeg = (270 + ii * 60 + 30) % 360;
+    var wRad    = worldDeg * D2R;
+    var fRot    = (worldDeg - 270) * D2R;
+
+    var ix = cx + Math.cos(wRad) * RiPos;
+    var iy = cy + Math.sin(wRad) * RiPos;
+    var lx = cx + Math.cos(wRad) * RlPos;
+    var ly = cy + Math.sin(wRad) * RlPos;
+
+    // Icon — always upright (no rotation keeps emoji readable)
+    ctx.save();
+    ctx.translate(ix, iy);
+    if (iseg.img){
+      var id = IS * 1.85;
+      ctx.drawImage(iseg.img, -id/2, -id/2, id, id);
+    } else {
+      ctx.strokeStyle = iseg.ic;
+      ctx.fillStyle   = iseg.ic;
+      ctx.lineWidth   = IS * 0.10;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      DRAW[iseg.fn](ctx, IS);
+    }
+    ctx.restore();
+
+    // Label — always horizontal for readability
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.fillStyle      = iseg.ic;
+    ctx.font           = 'bold ' + FS + 'px -apple-system,"PingFang SC",sans-serif';
+    ctx.textAlign      = 'center';
+    ctx.textBaseline   = 'middle';
+    ctx.shadowColor    = 'rgba(255,255,255,.35)';
+    ctx.shadowBlur     = 3;
+    ctx.fillText(iseg.name, 0, 0);
+    ctx.restore();
+  }
+
+  // 8. Gold inner separator ring
+  var sepR = RI + 9;
+  var sepG = ctx.createRadialGradient(cx-3, cy-3, 1, cx, cy, sepR);
+  sepG.addColorStop(0,   '#FFF8C0');
+  sepG.addColorStop(0.4, '#FFD700');
+  sepG.addColorStop(0.8, '#C8960C');
+  sepG.addColorStop(1,   '#7a5000');
+  ctx.beginPath(); ctx.arc(cx, cy, sepR, 0, PI*2);
+  ctx.fillStyle = sepG; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.lineWidth = 1.4; ctx.stroke();
+
+  // 9. Red center base
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,61,0,.5)';
+  ctx.shadowBlur  = 16;
+  var btnG = ctx.createRadialGradient(cx-4, cy-5, 2, cx, cy, RI);
+  btnG.addColorStop(0,   '#FF8A65');
+  btnG.addColorStop(0.5, '#E53935');
+  btnG.addColorStop(1,   '#B71C1C');
+  ctx.beginPath(); ctx.arc(cx, cy, RI, 0, PI*2);
+  ctx.fillStyle = btnG; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, RI, 0, PI*2);
+  ctx.strokeStyle = 'rgba(255,200,150,.45)';
+  ctx.lineWidth = 1.6; ctx.stroke();
+
+  // 10. Rotating needle
+  var nRad = needleAngle * D2R;
+  var nTip  = RO * 0.80;
+  var nTail = RI  * 0.30;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(nRad);
+
+  ctx.shadowColor   = 'rgba(0,0,0,.45)';
+  ctx.shadowBlur    = 6;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+
+  var nG = ctx.createLinearGradient(-nTail, 0, nTip, 0);
+  nG.addColorStop(0,    '#7a0000');
+  nG.addColorStop(0.15, '#D32F2F');
+  nG.addColorStop(0.55, '#FF5252');
+  nG.addColorStop(1,    '#FF1744');
+
+  ctx.beginPath();
+  ctx.moveTo(nTip, 0);
+  ctx.bezierCurveTo(nTip*0.58,  7,  -nTail*0.6,  5, -nTail, 0);
+  ctx.bezierCurveTo(-nTail*0.6, -5,  nTip*0.58, -7,  nTip, 0);
+  ctx.fillStyle = nG; ctx.fill();
+
+  // highlight stripe
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  ctx.beginPath();
+  ctx.moveTo(nTip*0.93, 0);
+  ctx.bezierCurveTo(nTip*0.52, 3.2, -nTail*0.4, 2.5, -nTail*0.85, 0);
+  ctx.strokeStyle = 'rgba(255,210,200,.55)';
+  ctx.lineWidth = 1.2; ctx.stroke();
+
+  ctx.restore();
+
+  // 11. Gold hub pin — on top
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.4)';
+  ctx.shadowBlur  = 6;
+  var hubG = ctx.createRadialGradient(cx-3, cy-3, 1, cx, cy, 13);
+  hubG.addColorStop(0,    '#FFFDE7');
+  hubG.addColorStop(0.35, '#FFD700');
+  hubG.addColorStop(0.75, '#B8860B');
+  hubG.addColorStop(1,    '#5a3d00');
+  ctx.beginPath(); ctx.arc(cx, cy, 13, 0, PI*2);
+  ctx.fillStyle = hubG; ctx.fill();
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, 13, 0, PI*2);
+  ctx.strokeStyle = 'rgba(255,255,220,.6)';
+  ctx.lineWidth = 1.2; ctx.stroke();
+  // inner dot
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fill();
+}
+
+// ─────────────────────────────────────────────
+//  Image preload
+// ─────────────────────────────────────────────
+var imagesLoaded = 0;
+var totalImages  = SEGS.length;
+
+function preloadImages(){
+  SEGS.forEach(function(seg){
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function(){
+      seg.img = img;
+      imagesLoaded++;
+      if (imagesLoaded === totalImages){ drawWheel(); }
+    };
+    img.onerror = function(){
+      imagesLoaded++;
+      if (imagesLoaded === totalImages){ drawWheel(); }
+    };
+    img.src = seg.imgSrc;
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Weighted random pick
+// ─────────────────────────────────────────────
+function pickSegment(){
+  var total = 0;
+  for (var i = 0; i < SEGS.length; i++) total += SEGS[i].prob;
+  var r = Math.random() * total;
+  var acc = 0;
+  for (var j = 0; j < SEGS.length; j++){
+    acc += SEGS[j].prob;
+    if (r < acc) return j;
+  }
+  return 0;
+}
+
+// ─────────────────────────────────────────────
+//  Easing
+// ─────────────────────────────────────────────
+function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+// ─────────────────────────────────────────────
+//  Spin logic
+// ─────────────────────────────────────────────
+function doSpin(){
+  if (spinning || chances <= 0) return;
+  spinning = true;
+
+  var btn = document.getElementById('spinBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 抽奖中…';
+
+  var segIdx    = pickSegment();
+  var targetDeg = (270 + segIdx * 60 + 30) % 360;   // where needle must end
+  var extra     = (5 + Math.floor(Math.random() * 4)) * 360;
+  var curMod    = ((needleAngle % 360) + 360) % 360;
+  var align     = (targetDeg - curMod + 360) % 360;
+  var totalRot  = needleAngle + extra + align;
+  var duration  = 3000 + Math.random() * 1000;
+
+  var startAngle = needleAngle;
+  var startTime  = null;
+
+  function frame(ts){
+    if (!startTime) startTime = ts;
+    var elapsed = ts - startTime;
+    var t = Math.min(elapsed / duration, 1);
+    var e = easeOutCubic(t);
+    needleAngle = startAngle + (totalRot - startAngle) * e;
+    drawWheel();
+    if (t < 1){
+      animRafId = requestAnimationFrame(frame);
+    } else {
+      needleAngle = totalRot; // snap exact
+      drawWheel();
+      spinning = false;
+      chances--;
+      document.getElementById('chancesNum').textContent = Math.max(0, chances);
+      showResult(segIdx);
+    }
+  }
+  animRafId = requestAnimationFrame(frame);
+}
+
+// ─────────────────────────────────────────────
+//  Modal icon draw
+// ─────────────────────────────────────────────
+function drawModalIcon(canvasId, segIdx, sz){
+  var c   = document.getElementById(canvasId);
+  if (!c) return;
+  var dpr2 = window.devicePixelRatio || 1;
+  c.width  = sz * dpr2;
+  c.height = sz * dpr2;
+  c.style.width  = sz + 'px';
+  c.style.height = sz + 'px';
+  var ctx = c.getContext('2d');
+  ctx.scale(dpr2, dpr2);
+  ctx.translate(sz/2, sz/2);
+  var seg = SEGS[segIdx];
+  if (seg.img){
+    var d = sz * 0.82;
+    ctx.drawImage(seg.img, -d/2, -d/2, d, d);
+  } else {
+    var color = segIdx === 0 ? '#6060a0' : '#8B6000';
+    ctx.strokeStyle = color;
+    ctx.fillStyle   = color;
+    ctx.lineWidth   = 2.4;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    DRAW[seg.fn](ctx, sz * 0.36);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Show result modal
+// ─────────────────────────────────────────────
+function showResult(segIdx){
+  var seg  = SEGS[segIdx];
+  var isWin = segIdx !== 0;
+
+  if (isWin){
+    drawModalIcon('winIcon', segIdx, 80);
+    document.getElementById('winTitle').textContent = seg.result.title;
+    document.getElementById('winText').textContent  = seg.result.text;
+    document.getElementById('winOverlay').classList.add('show');
+    startConfetti();
+  } else {
+    drawModalIcon('loseIcon', segIdx, 80);
+    document.getElementById('loseTitle').textContent = seg.result.title;
+    document.getElementById('loseText').textContent  = seg.result.text;
+    document.getElementById('loseOverlay').classList.add('show');
+    // Shake page
+    var page = document.getElementById('page');
+    page.classList.remove('shake');
+    // force reflow
+    void page.offsetWidth;
+    page.classList.add('shake');
+    page.addEventListener('animationend', function handler(){
+      page.classList.remove('shake');
+      page.removeEventListener('animationend', handler);
+    });
+  }
+}
+
+function closeModal(){
+  document.getElementById('winOverlay').classList.remove('show');
+  document.getElementById('loseOverlay').classList.remove('show');
+  stopConfetti();
+
+  var btn = document.getElementById('spinBtn');
+  if (chances > 0){
+    btn.disabled = false;
+    btn.textContent = '🎰 开始抽奖！';
+  } else {
+    btn.disabled = true;
+    btn.textContent = '机会用完啦';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Confetti
+// ─────────────────────────────────────────────
+var confettiCanvas  = document.getElementById('confettiCanvas');
+var confettiCtx     = confettiCanvas.getContext('2d');
+var confettiParticles = [];
+var confettiRafId   = null;
+var confettiRunning = false;
+
+var CONFETTI_COLORS = [
+  '#FF5252','#FFD700','#69F0AE','#40C4FF','#EA80FC',
+  '#FF9100','#FF4081','#18FFFF','#FFFF00','#FF6D00',
+  '#B2FF59','#E040FB','#1DE9B6','#FFCA28'
+];
+
+function startConfetti(){
+  confettiCanvas.style.display = 'block';
+  confettiCanvas.width  = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+  confettiParticles = [];
+  for (var i = 0; i < 100; i++){
+    confettiParticles.push({
+      x:    Math.random() * window.innerWidth,
+      y:    Math.random() * window.innerHeight * 0.4 - 20,
+      vx:   (Math.random() - 0.5) * 4,
+      vy:   Math.random() * 2 + 1,
+      w:    Math.random() * 8 + 4,
+      h:    Math.random() * 6 + 3,
+      angle: Math.random() * 360,
+      spin:  (Math.random() - 0.5) * 8,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      alpha: 1,
+      life:  Math.random() * 80 + 60
+    });
+  }
+  confettiRunning = true;
+  animateConfetti();
+}
+
+function animateConfetti(){
+  if (!confettiRunning) return;
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  var alive = false;
+  for (var i = 0; i < confettiParticles.length; i++){
+    var p = confettiParticles[i];
+    if (p.alpha <= 0) continue;
+    alive = true;
+    p.x    += p.vx;
+    p.y    += p.vy;
+    p.vy   += 0.22; // gravity
+    p.angle += p.spin;
+    p.life--;
+    if (p.life < 30) p.alpha = Math.max(0, p.life / 30);
+    confettiCtx.save();
+    confettiCtx.globalAlpha = p.alpha;
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate(p.angle * Math.PI / 180);
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.beginPath();
+    confettiCtx.roundRect(-p.w/2, -p.h/2, p.w, p.h, 2);
+    confettiCtx.fill();
+    confettiCtx.restore();
+  }
+  if (alive){
+    confettiRafId = requestAnimationFrame(animateConfetti);
+  } else {
+    stopConfetti();
+  }
+}
+
+function stopConfetti(){
+  confettiRunning = false;
+  if (confettiRafId){ cancelAnimationFrame(confettiRafId); confettiRafId = null; }
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  confettiCanvas.style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
+//  Event binding — WeChat compat (touchstart + click)
+// ─────────────────────────────────────────────
+function bindBtn(id, fn){
+  var el = document.getElementById(id);
+  var touched = false;
+  el.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    touched = true;
+    fn();
+  }, { passive: false });
+  el.addEventListener('click', function(){
+    if (touched){ touched = false; return; }
+    fn();
+  });
+}
+
+bindBtn('spinBtn',  doSpin);
+bindBtn('winBtn',   closeModal);
+bindBtn('loseBtn',  closeModal);
+
+// ─────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────
+resize();
+preloadImages();
+
+})();
+</script>
+</body>
+</html>
