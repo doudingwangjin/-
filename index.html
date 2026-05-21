@@ -746,8 +746,10 @@ function doSpin(){
   var startTime      = null;
   var prevFrameAngle = needleAngle;
 
-  // stop idle chase while spinning
+  // stop idle chase and snap ledPhase to needle tip before spinning
   if (ledIdleRaf){ cancelAnimationFrame(ledIdleRaf); ledIdleRaf = null; }
+  var normAngle = ((needleAngle % 360) + 360) % 360;
+  ledPhase = ((normAngle + 90) * 24 / 360) % 24;
 
   function frame(ts){
     if (!startTime) startTime = ts;
