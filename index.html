@@ -423,6 +423,8 @@ var chances   = 3;
 var spinning  = false;
 var needleAngle = 270; // starts pointing up (top = 270° in canvas convention)
 var animRafId  = null;
+var ledPhase   = 0;    // 0..24, chaser position around the LED ring
+var ledIdleRaf = null; // idle slow-chase animation
 
 // ─────────────────────────────────────────────
 //  Canvas setup
@@ -481,7 +483,7 @@ function drawWheel(){
   ctx.strokeStyle = 'rgba(255,215,0,.65)';
   ctx.lineWidth = 1.5; ctx.stroke();
 
-  // 4. LED dots — 24 total, every 3rd orange
+  // 4. LED dots — 24 total, chaser effect driven by ledPhase
   var nDots = 24;
   var ledR  = (RO + RRing) / 2;
   for (var di = 0; di < nDots; di++){
@@ -489,11 +491,22 @@ function drawWheel(){
     var dx = cx + Math.cos(da) * ledR;
     var dy = cy + Math.sin(da) * ledR;
     var big = (di % 3 === 0);
+    // distance from current chase head (0 = head, wraps around)
+    var dist = ((di - Math.floor(ledPhase)) % nDots + nDots) % nDots;
+    var lit  = dist < 4; // 4-dot bright head
     ctx.save();
-    ctx.shadowColor = big ? 'rgba(255,109,0,.95)' : 'rgba(255,255,255,.75)';
-    ctx.shadowBlur  = big ? 11 : 7;
-    ctx.beginPath(); ctx.arc(dx, dy, big ? 5 : 3, 0, PI*2);
-    ctx.fillStyle = big ? '#FF6D00' : '#FFFFFF'; ctx.fill();
+    if (lit){
+      ctx.shadowColor = big ? 'rgba(255,140,0,1)' : 'rgba(255,255,255,1)';
+      ctx.shadowBlur  = big ? 18 : 12;
+      ctx.beginPath(); ctx.arc(dx, dy, big ? 6.5 : 4, 0, PI*2);
+      ctx.fillStyle = big ? '#FF6D00' : '#FFFFFF';
+    } else {
+      ctx.shadowColor = big ? 'rgba(255,109,0,.22)' : 'rgba(255,255,255,.18)';
+      ctx.shadowBlur  = big ? 4 : 3;
+      ctx.beginPath(); ctx.arc(dx, dy, big ? 3.5 : 2, 0, PI*2);
+      ctx.fillStyle = big ? 'rgba(255,109,0,.30)' : 'rgba(255,255,255,.28)';
+    }
+    ctx.fill();
     ctx.restore();
   }
 
@@ -729,8 +742,12 @@ function doSpin(){
   var totalRot  = needleAngle + extra + align;
   var duration  = 3000 + Math.random() * 1000;
 
-  var startAngle = needleAngle;
-  var startTime  = null;
+  var startAngle     = needleAngle;
+  var startTime      = null;
+  var prevFrameAngle = needleAngle;
+
+  // stop idle chase while spinning
+  if (ledIdleRaf){ cancelAnimationFrame(ledIdleRaf); ledIdleRaf = null; }
 
   function frame(ts){
     if (!startTime) startTime = ts;
@@ -738,6 +755,10 @@ function doSpin(){
     var t = Math.min(elapsed / duration, 1);
     var e = easeOutCubic(t);
     needleAngle = startAngle + (totalRot - startAngle) * e;
+    // advance LED chaser proportional to needle angular speed
+    var delta = needleAngle - prevFrameAngle;
+    ledPhase = (ledPhase + delta * 24 / 360 + 24) % 24;
+    prevFrameAngle = needleAngle;
     drawWheel();
     if (t < 1){
       animRafId = requestAnimationFrame(frame);
@@ -747,10 +768,29 @@ function doSpin(){
       spinning = false;
       chances--;
       document.getElementById('chancesNum').textContent = Math.max(0, chances);
+      startIdleChase();
       showResult(segIdx);
     }
   }
   animRafId = requestAnimationFrame(frame);
+}
+
+// ─────────────────────────────────────────────
+//  Idle LED chase (slow, when not spinning)
+// ─────────────────────────────────────────────
+function startIdleChase(){
+  if (ledIdleRaf) cancelAnimationFrame(ledIdleRaf);
+  var last = null;
+  function idleFrame(ts){
+    if (last !== null){
+      var dt = ts - last;
+      ledPhase = (ledPhase + dt * 0.008 + 24) % 24; // ~0.2 dots/frame @60fps
+      drawWheel();
+    }
+    last = ts;
+    ledIdleRaf = requestAnimationFrame(idleFrame);
+  }
+  ledIdleRaf = requestAnimationFrame(idleFrame);
 }
 
 // ─────────────────────────────────────────────
@@ -931,6 +971,7 @@ bindBtn('loseBtn',  closeModal);
 // ─────────────────────────────────────────────
 resize();
 preloadImages();
+startIdleChase();
 
 })();
 </script>
